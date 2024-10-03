@@ -30,6 +30,9 @@
             padding: 8px;
             text-align: left;
         }
+        button {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -57,8 +60,9 @@
         </tbody>
     </table>
 
-    <!-- Download Button -->
-    <button id="download-btn">Download as CSV</button>
+    <!-- Buttons -->
+    <button id="next-btn">Next Card</button>
+    <button id="download-btn">Download All as CSV</button>
 
     <!-- Script Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract.min.js"></script>
@@ -66,17 +70,20 @@
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureBtn = document.getElementById('capture-btn');
+        const nextBtn = document.getElementById('next-btn');
         const downloadBtn = document.getElementById('download-btn');
         const dataTable = document.getElementById('data-table').getElementsByTagName('tbody')[0];
         const context = canvas.getContext('2d');
 
-        // Access the device's camera
-        navigator.mediaDevices.getUserMedia({ video: true })
+        let allCardsData = [];  // To store data for multiple cards
+
+        // Access the device's back camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } })
             .then(stream => {
                 video.srcObject = stream;
             })
             .catch(err => {
-                console.error('Error accessing camera: ', err);
+                console.error('Error accessing back camera: ', err);
             });
 
         // Capture the image and perform OCR
@@ -100,14 +107,22 @@
                         Company: extractCompany(text),
                     };
 
-                    // Populate the table with the extracted information
+                    // Store the current card's data
+                    allCardsData.push(extractedData);
+
+                    // Populate the table with the current card's data
                     populateTable(extractedData);
                 });
         });
 
+        // Prepare for scanning the next card
+        nextBtn.addEventListener('click', () => {
+            // Clear the table for the next card
+            dataTable.innerHTML = '';
+        });
+
         // Functions to extract data from the recognized text (these can be customized)
         function extractName(text) {
-            // Simple name extraction (for demo purposes, more sophisticated logic may be needed)
             const lines = text.split('\n');
             return lines[0] || 'N/A';  // Assuming the first line is the name
         }
@@ -125,7 +140,6 @@
         }
 
         function extractCompany(text) {
-            // Assume the company is mentioned after the name
             const lines = text.split('\n');
             return lines[1] || 'N/A';  // Assuming the second line is the company
         }
@@ -143,14 +157,14 @@
             }
         }
 
-        // Function to download the data as CSV
+        // Function to download all scanned cards as CSV
         downloadBtn.addEventListener('click', () => {
-            const rows = [['Field', 'Value']];  // Header row
-            for (let i = 0; i < dataTable.rows.length; i++) {
-                const row = dataTable.rows[i];
-                const rowData = [row.cells[0].textContent, row.cells[1].textContent];
+            const rows = [['Name', 'Email', 'Phone', 'Company']];  // Header row
+
+            allCardsData.forEach(card => {
+                const rowData = [card.Name, card.Email, card.Phone, card.Company];
                 rows.push(rowData);
-            }
+            });
 
             // Convert to CSV format
             const csvContent = rows.map(e => e.join(',')).join('\n');
@@ -161,7 +175,7 @@
             const a = document.createElement('a');
             a.setAttribute('hidden', '');
             a.setAttribute('href', url);
-            a.setAttribute('download', 'business_card_data.csv');
+            a.setAttribute('download', 'business_cards_data.csv');
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
