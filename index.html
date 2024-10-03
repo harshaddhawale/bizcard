@@ -77,14 +77,27 @@
 
         let allCardsData = [];  // To store data for multiple cards
 
-        // Access the device's back camera
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: { exact: 'environment' } } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                console.error('Error accessing back camera: ', err);
-            });
+        // Function to get the appropriate camera (back camera for mobile, front for laptop)
+        function startCamera() {
+            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);  // Simple check for mobile devices
+
+            const constraints = {
+                video: {
+                    facingMode: isMobile ? { exact: 'environment' } : 'user'  // Try back camera on mobile, front camera otherwise
+                }
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then(stream => {
+                    video.srcObject = stream;
+                })
+                .catch(err => {
+                    console.error('Error accessing camera: ', err);
+                });
+        }
+
+        // Start the camera on page load
+        window.onload = startCamera;
 
         // Capture the image and perform OCR
         captureBtn.addEventListener('click', () => {
