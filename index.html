@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Card Scanner</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        video {
+            border: 1px solid #ccc;
+            width: 100%;
+            max-width: 400px;
+            margin-bottom: 10px;
+        }
+        canvas {
+            display: none;
+        }
+        table {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Business Card Scanner</h2>
+
+    <!-- Video Element to Capture Camera Stream -->
+    <video id="video" autoplay></video>
+    <button id="capture-btn">Capture and Scan</button>
+
+    <!-- Canvas to Capture the Snapshot -->
+    <canvas id="canvas" width="400" height="300"></canvas>
+
+    <!-- Table to Store Extracted Information -->
+    <h3>Extracted Information</h3>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data rows will be added here dynamically -->
+        </tbody>
+    </table>
+
+    <!-- Download Button -->
+    <button id="download-btn">Download as CSV</button>
+
+    <!-- Script Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.0/dist/tesseract.min.js"></script>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureBtn = document.getElementById('capture-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const dataTable = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+        const context = canvas.getContext('2d');
+
+        // Access the device's camera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error('Error accessing camera: ', err);
+            });
+
+        // Capture the image and perform OCR
+        captureBtn.addEventListener('click', () => {
+            // Draw the video frame onto the canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert the canvas content to a data URL (image)
+            const imageDataUrl = canvas.toDataURL('image/png');
+
+            // Use Tesseract.js to recognize text from the image
+            Tesseract.recognize(imageDataUrl, 'eng', { logger: info => console.log(info) })
+                .then(({ data: { text } }) => {
+                    console.log(text);
+
+                    // Parse the text (example only, real business cards will need better parsing)
+                    const extractedData = {
+                        Name: extractName(text),
+                        Email: extractEmail(text),
+                        Phone: extractPhoneNumber(text),
+                        Company: extractCompany(text),
+                    };
+
+                    // Populate the table with the extracted information
+                    populateTable(extractedData);
+                });
+        });
+
+        // Functions to extract data from the recognized text (these can be customized)
+        function extractName(text) {
+            // Simple name extraction (for demo purposes, more sophisticated logic may be needed)
+            const lines = text.split('\n');
+            return lines[0] || 'N/A';  // Assuming the first line is the name
+        }
+
+        function extractEmail(text) {
+            const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b/;
+            const match = text.match(emailRegex);
+            return match ? match[0] : 'N/A';
+        }
+
+        function extractPhoneNumber(text) {
+            const phoneRegex = /(\+?\d{1,4}[\s-]?)?(\(?\d{3}\)?[\s-]?)?\d{3}[\s-]?\d{4}/;
+            const match = text.match(phoneRegex);
+            return match ? match[0] : 'N/A';
+        }
+
+        function extractCompany(text) {
+            // Assume the company is mentioned after the name
+            const lines = text.split('\n');
+            return lines[1] || 'N/A';  // Assuming the second line is the company
+        }
+
+        // Populate the table with the extracted information
+        function populateTable(data) {
+            dataTable.innerHTML = '';  // Clear existing rows
+
+            for (const key in data) {
+                const row = dataTable.insertRow();
+                const cell1 = row.insertCell(0);
+                const cell2 = row.insertCell(1);
+                cell1.textContent = key;
+                cell2.textContent = data[key];
+            }
+        }
+
+        // Function to download the data as CSV
+        downloadBtn.addEventListener('click', () => {
+            const rows = [['Field', 'Value']];  // Header row
+            for (let i = 0; i < dataTable.rows.length; i++) {
+                const row = dataTable.rows[i];
+                const rowData = [row.cells[0].textContent, row.cells[1].textContent];
+                rows.push(rowData);
+            }
+
+            // Convert to CSV format
+            const csvContent = rows.map(e => e.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+
+            // Create a download link
+            const a = document.createElement('a');
+            a.setAttribute('hidden', '');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'business_card_data.csv');
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    </script>
+
+</body>
+</html>
