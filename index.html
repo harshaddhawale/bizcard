@@ -42,6 +42,7 @@
     <!-- Video Element to Capture Camera Stream -->
     <video id="video" autoplay></video>
     <button id="capture-btn">Capture and Scan</button>
+    <button id="switch-btn">Switch Camera</button>
 
     <!-- Canvas to Capture the Snapshot -->
     <canvas id="canvas" width="400" height="300"></canvas>
@@ -70,34 +71,53 @@
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureBtn = document.getElementById('capture-btn');
+        const switchBtn = document.getElementById('switch-btn');
         const nextBtn = document.getElementById('next-btn');
         const downloadBtn = document.getElementById('download-btn');
         const dataTable = document.getElementById('data-table').getElementsByTagName('tbody')[0];
         const context = canvas.getContext('2d');
 
         let allCardsData = [];  // To store data for multiple cards
+        let currentStream;  // Store the current stream
+        let videoDevices = [];  // To store all available video devices
+        let currentDeviceIndex = 0;  // Track the current video device being used
 
-        // Function to get the appropriate camera (back camera for mobile, front for laptop)
-        function startCamera() {
-            const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);  // Simple check for mobile devices
+        // Function to get video devices (cameras)
+        async function getVideoDevices() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            videoDevices = devices.filter(device => device.kind === 'videoinput');
+        }
+
+        // Function to start the camera with a specific device
+        async function startCamera(deviceId = null) {
+            if (currentStream) {
+                // Stop the current stream before switching
+                currentStream.getTracks().forEach(track => track.stop());
+            }
 
             const constraints = {
                 video: {
-                    facingMode: isMobile ? { exact: 'environment' } : 'user'  // Try back camera on mobile, front camera otherwise
+                    deviceId: deviceId ? { exact: deviceId } : undefined
                 }
             };
 
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then(stream => {
-                    video.srcObject = stream;
-                })
-                .catch(err => {
-                    console.error('Error accessing camera: ', err);
-                });
+            currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+            video.srcObject = currentStream;
         }
 
-        // Start the camera on page load
-        window.onload = startCamera;
+        // Initialize the camera on page load
+        window.onload = async () => {
+            await getVideoDevices();  // Get all available video devices
+            if (videoDevices.length > 0) {
+                startCamera(videoDevices[currentDeviceIndex].deviceId);  // Start with the first camera
+            }
+        };
+
+        // Switch camera when the "Switch Camera" button is clicked
+        switchBtn.addEventListener('click', () => {
+            currentDeviceIndex = (currentDeviceIndex + 1) % videoDevices.length;  // Cycle through available devices
+            startCamera(videoDevices[currentDeviceIndex].deviceId);
+        });
 
         // Capture the image and perform OCR
         captureBtn.addEventListener('click', () => {
